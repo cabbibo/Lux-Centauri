@@ -1,0 +1,59 @@
+﻿#pragma kernel CSMain
+  
+struct Vert{
+	 float used;
+     float3 pos;
+     float3 vel;
+     float3 nor;
+     float2 uv;
+     float3 targetPos;
+     float3 debug;
+};
+
+float4x4 transform;
+
+float _DeltaTime;
+
+RWStructuredBuffer<Vert> vertBuffer;
+
+#include "Chunks/snoise.cginc"
+#include "Chunks/curlNoise.cginc"
+
+
+#define NR_THREADS 256
+[numthreads(NR_THREADS,1,1)]
+void CSMain (uint threadID : SV_GroupIndex, uint3 u3GroupID : SV_GroupID, uint3 id : SV_DispatchThreadID) {
+  
+  int pID = threadID + u3GroupID * NR_THREADS;
+
+  Vert vert = vertBuffer[pID];
+
+
+  float3 basePos; 
+  if( vert.used == 1 ){
+  	basePos = mul( transform , float4( vert.targetPos , 1)).xyz;
+  }
+
+  float3 force = float3( 0,0,0);
+
+  force += .01 * curlNoise( vert.pos );
+  vert.debug.x -= .001;
+  if( vert.debug.x <= 0 ){
+  	vert.debug.x = 1;
+  	vert.vel = 0;
+  	vert.pos = basePos;
+  }
+
+
+  vert.vel += force * _DeltaTime ;   
+  if( length( vert.vel) > 1 ){ vert.vel = normalize( vert.vel ) * 1;}
+  vert.pos += vert.vel;
+
+  vert.vel *= .95;
+
+ 
+
+
+  vertBuffer[pID] = vert;
+
+}
